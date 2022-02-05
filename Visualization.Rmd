@@ -1,0 +1,302 @@
+---
+title: "Media_landscape_visualization"
+author: "Yvonne JIN"
+date: "10/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+??mutate_at
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r import dataset}
+setwd("~/Documents/Media_project")
+
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(RColorBrewer)
+df <- read_csv("video_database_1010.csv") 
+#class(df) a tibble
+colnames(df)
+summary(df)
+
+
+```
+
+## Plots
+
+Violin plots showing number of views and number of videos in each category
+
+```{r pressure, echo=FALSE}
+
+df_1 <- df %>% select(uploader = "账号名称", view = "视频观看量(W)", danmuku_n = "弹幕数（W）",category = "类别分类", playfulness = "风格分类（playful patriotism）") %>% na.omit(view)
+
+# missing 1 已下架
+
+#mutate(variable=recode(variable,"oldname"="newname"))
+df_1 <- df_1 %>% mutate(
+  category =  recode(category,"（1）国家、民族精神体现类"= "National Spirit",
+                     "（2）国家成就类" = "National Achievement",
+                     "（3）政治外交类" = "International Affairs",
+                     "（4）国家民族历史与文化类" = "Culture and History",
+                     "（5）思想教育、价值观引导类" = "Ideology Education"),
+  view = view*0.01, # unit: million
+  danmuku_n = danmuku_n*10000, # unit: individual
+  d_to_view = danmuku_n/view
+  )
+
+#disable scientific notation
+df_1$d_to_view <- format(df_1$d_to_view, scientific = FALSE)
+
+
+```
+
+
+## Plot for views per category
+
+```{r}
+##category
+table(df_1$category)
+#translate category into english!
+
+df_1 %>% ggplot(aes(category,view)) +
+  geom_violin() +
+  theme_minimal() + 
+  labs(x="Video Category", y="Number of Views (Million)")
+  
+##playfulness
+table(df_1$playfulness)
+df_1 %>% na.omit %>% ggplot(aes(playfulness,view)) +
+  geom_violin() +
+  theme_minimal() + 
+  labs(x="Playfulness", y="Number of Views (Million)")
+
+```
+
+## Playfulness X Category
+```{r}
+#playful not playful cleaned-up
+
+
+table(df_1$category, df_1$playfulness)
+
+df_1 %>% na.omit() %>%
+  ggplot(aes(x=playfulness,y=category)) +
+  geom_count(shape = 1) +
+  scale_shape(3,solid = FALSE) +
+  scale_radius(range=c(1,45)) +
+  theme_minimal() +
+  annotate(geom = "text", x = "playful",y = "International Affairs", label = 30) +
+  annotate(geom = "text", x = "not playful",y = "International Affairs", label = 16) +
+  annotate(geom = "text", x = "playful",y = "National Spirit", label = 4) +
+  annotate(geom = "text", x = "not playful",y = "National Spirit", label = 18) +
+  annotate(geom = "text", x = "not playful",y = "Ideology Education", label = 17) +
+  annotate(geom = "text", x = "not playful",y = "National Achievement", label = 7) +
+  annotate(geom = "text", x = "not playful",y = "Culture and History", label = 4) +
+  theme(legend.position = "none") +
+  labs(x="Playfulness", y="Category")
+
+#add color
+  
+```
+
+Heatmap (not in use)
+```{r eval=FALSE, include=FALSE}
+
+#ggplot
+df_1 %>% na.omit %>%
+  ggplot(aes(x=category,y=playfulness, fill=view)) +
+  geom_tile() +
+  scale_fill_gradient(low="blue", high="red")
+  #scale_fill_distiller(palette = "PuBu") 
+
+?scale_fill_brewer
+  
+```
+
+## Danmuku:Views - indicator for viewer participation
+
+```{r}
+
+#added danmaku variable
+df_1 %>% ggplot(aes(category,log(danmuku_n))) +
+  geom_violin() +
+  theme_minimal() + 
+  labs(x="Video Category", y="Log( Number of danmuku to million views)")
+
+
+```
+
+
+
+## Recode for interaction modes
+
+```{r upstream and downstream}
+
+# recode upstream & downstream -> four categories?
+
+colnames(df)
+df_2 <- select(df, uploader = "账号名称", view = "视频观看量(W)", category = "类别分类",danmuku_n = "弹幕数（W）", playfulness = "风格分类（playful patriotism）", upstream_uploader = "上游视频发布主体", upstream_n = "上游视频数量", upstream_view = "上游视频浏览量", downstream_uploader = "下游视频发布主体", downstream_n = "下游视频数量", downstream_view = "下游视频浏览量") 
+
+summary(df_2)
+
+# same as df_1
+df_2 <- df_2 %>% mutate(
+    category =  recode(category,"（1）国家、民族精神体现类"= "National Spirit",
+                     "（2）国家成就类" = "National Achievement",
+                     "（3）政治外交类" = "International Affairs",
+                     "（4）国家民族历史与文化类" = "Culture and History",
+                     "（5）思想教育、价值观引导类" = "Ideology Education"),
+  view = view*0.01, # unit: million
+  danmuku_n = danmuku_n*10000, # unit: individual
+  d_to_view = danmuku_n/view
+)
+
+#disable scientific notation
+df_2$d_to_view <- format(df_2$d_to_view, scientific = FALSE)
+
+# check notation consistency
+table(df_2$upstream_uploader)
+table(df_2$downstream_uploader)
+
+df_2 <- df_2 %>% mutate(
+  upstream_uploader = recode(upstream_uploader,"Non official" = "Non-official", "Official&Non-official" = "Official & Non-official"), # fix notation inconsistency
+  downstream_uploader = recode(downstream_uploader, "Non-official & official" = "Official & Non-official"))
+
+# check notation consistency
+table(df_2$upstream_uploader)
+table(df_2$downstream_uploader)
+
+
+df_2 <- df_2 %>% mutate(
+  interaction_mode = case_when(
+    (upstream_uploader == "N/A" |upstream_uploader == "Official" ) & (downstream_uploader == "N/A" | downstream_uploader == "Official") ~ "Official Only",
+    (upstream_uploader == "N/A" |upstream_uploader == "Official" ) & (downstream_uploader == "Non-official" | downstream_uploader == "Official & Non-official") ~ "Top-Down",
+    (upstream_uploader == "Non-official" | upstream_uploader == "Official & Non-official") & (downstream_uploader == "N/A" | downstream_uploader == "Official") ~ "Bottom-Up",
+    (upstream_uploader == "Non-official" | upstream_uploader == "Official & Non-official") & (downstream_uploader  == "Non-official" | downstream_uploader == "Official & Non-official" ) ~ "Bidirectional"
+  ))
+
+# Official Only: re-upload and interaction between official accounts
+# Top-down: Official account upload first, non-official account imitate
+# Bottom-up: Non-official account upload first, official account re-upload
+# Bidirectional: Non-official account upload first, official account re-upload, non-official account then imitate
+
+
+``` 
+
+## Category X Interaction Mode
+```{r}
+
+table(df_2$category,df_2$interaction_mode)
+
+# count
+df_2 %>% na.omit() %>%
+  ggplot(aes(x=interaction_mode,y=category)) +
+  geom_count(shape = 1) +
+  scale_shape(3,solid = FALSE) +
+  scale_radius(range=c(1,38)) +
+  theme_minimal() +
+  labs(x="Interaction Mode", y="Category")
+
+# bar chart
+# 6 fill 4
+df_2 %>% na.omit %>%
+  ggplot(aes(x=interaction_mode,fill=category)) +
+  geom_bar() + 
+  scale_fill_brewer(palette = "PuBuGn") +
+  theme_minimal() +
+  labs(x="Interaction_Mode", y="Number of Videos")
+
+# 4 fill 6
+df_2 %>% na.omit %>%
+  ggplot(aes(x=category,fill=interaction_mode)) +
+  geom_bar() + 
+  scale_fill_brewer(palette = "PuBuGn") +
+  theme_minimal() +
+  labs(x="Category", y="Number of Videos")
+
+#heatmap
+#df_2 %>% na.omit %>% ggplot(aes(x=category,y=interaction_mode,fill=view)) +
+#  geom_tile()
+
+
+#df_1 %>% ggplot(aes(x=category,y=playfulness, fill=view)) +
+#  geom_tile() +
+#  scale_fill_distiller(palette = "RdPu") 
+
+display.brewer.all()
+
+```
+
+playfulness X interactive mode
+```{r}
+df_2 %>% na.omit %>%
+  mutate(interaction_mode = factor(interaction_mode, levels=c("Bidirectional", "Top-Down", "Bottom-Up","Official Only"))) %>%
+  ggplot(aes(x=playfulness,fill=interaction_mode)) +
+  geom_bar(position="fill") + 
+  scale_fill_brewer(palette = "PuBuGn") +
+  theme_minimal() +
+  labs(x="Playfulness", y="Percentage")
+
+
+```
+## danmuku & playfulness
+
+```{r}
+
+df_1 %>% ggplot(aes(playfulness,log(danmuku_n))) +
+  geom_violin() +
+  theme_minimal() + 
+  labs(x="Playfulness", y="Number of danmuku to million views")
+
+
+```
+
+
+## statistical analysis
+
+## playfulness -> more interactive?
+```{r}
+
+df_2 <- df_2 %>% mutate(
+  interactive_degree = case_when(
+    interaction_mode == "Official Only" ~ "Low",
+    interaction_mode == "Top-Down" | interaction_mode == "Bottom-Up" ~ "One-directional",
+    interaction_mode == "Bidirectional" ~ "Bidirectional"
+  )
+)
+
+df_2 %>% na.omit %>%
+  mutate(interactive_degree = factor(interactive_degree, levels=c("Bidirectional", "One-directional", "Low"))) %>%
+  ggplot(aes(x=playfulness,fill=interactive_degree)) +
+  geom_bar(position="fill") + 
+  scale_fill_brewer(palette = "PuBuGn") +
+  theme_minimal() +
+  labs(x="Category", y="Number of Videos")
+
+
+```
+
+## playfulness -> more danmuku?
+
+```{r}
+
+#In Jamovi
+```
+
+
+## output
+
+```{r}
+write.csv(df_2, "database_coded.csv",row.names = F, fileEncoding = "UTF-8")
+```
+
